@@ -30,7 +30,7 @@ import {
 import { rollRune } from './runes'
 import { growTalents, MAX_LEVEL, talentTotals } from './talents'
 import type { DropTier, LootAction } from './loot'
-import { newPack, PACKS_PER_AREA, placeOf, WALK_SECONDS, xpToNext } from './monsters'
+import { newPack, PACKS_PER_AREA, placeOf, WALK_SECONDS, xpToNext, zonePower } from './monsters'
 import { classSkills, skillOf, SKILLS } from './skilltree'
 import type { CurseEffect, SkillDef } from './skilltree'
 
@@ -389,8 +389,9 @@ const reap = (start: Character, before: Character, stats: HeroStats, rng: Rng, e
   c.foes.forEach((foe, i) => {
     if (foe.hp > 0 || (before.foes[i]?.hp ?? 0) <= 0) return
     const gold = Math.round(foe.gold * (1 + stats.goldFind / 100))
-    events.push({ kind: 'kill', foe: i, name: foe.name, xp: foe.xp, gold, ...(foe.elite ? { elite: foe.elite } : {}) })
-    c = { ...c, gold: c.gold + gold, xp: c.xp + foe.xp, totalKills: c.totalKills + 1, corpse: foe.maxHp }
+    const xp = Math.round(foe.xp * (1 + stats.xpPct / 100))
+    events.push({ kind: 'kill', foe: i, name: foe.name, xp, gold, ...(foe.elite ? { elite: foe.elite } : {}) })
+    c = { ...c, gold: c.gold + gold, xp: c.xp + xp, totalKills: c.totalKills + 1, corpse: foe.maxHp }
     if (stats.talent.onKillHeal) {
       c = {
         ...c,
@@ -530,6 +531,10 @@ const advance = (start: Character, rng: Rng, events: CombatEvent[]): Character =
   return arrive(c, rng, events)
 }
 
+/** The most gold a death can take: what this many plain monsters of the area drop. */
+const DEATH_GOLD_KILLS = 30
+export const deathGoldCap = (zone: number) => Math.round(5 * 0.5 * zonePower(zone).reward * DEATH_GOLD_KILLS)
+
 const die = (c: Character, rng: Rng, events: CombatEvent[]): Character => {
   if (c.rift) {
     events.push({ kind: 'death', isRetreat: false, goldLost: 0 })
@@ -538,7 +543,7 @@ const die = (c: Character, rng: Rng, events: CombatEvent[]): Character => {
   }
   const areaDeaths = c.areaDeaths + 1
   const isRetreat = areaDeaths >= RETREAT_AFTER && c.zone > 0
-  const goldLost = Math.floor(c.gold * 0.1)
+  const goldLost = Math.min(Math.floor(c.gold * 0.1), deathGoldCap(c.zone))
   events.push({ kind: 'death', isRetreat, goldLost })
   const zone = isRetreat ? c.zone - 1 : c.zone
   const fallen: Character = {
@@ -576,7 +581,16 @@ const timePasses = (c: Character): Character => {
     return { ...f, status: s }
   })
 
-  return { ...c, cooldowns, buffs, foes, chilled: Math.max(0, c.chilled - 1) }
+  return {
+    ...c,
+    cooldowns,
+    buffs,
+    foes,
+    chilled: Math.max(0, c.chilled - 1),
+    focus: Math.max(0, c.focus - 1),
+    blessing: Math.max(0, c.blessing - 1),
+    chestCooldown: Math.max(0, c.chestCooldown - 1),
+  }
 }
 
 const burnAndPoison = (c: Character, events: CombatEvent[]): Character => ({

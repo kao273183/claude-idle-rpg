@@ -16,9 +16,11 @@ import {
   skillPointsLeft,
 } from '../hooks/character'
 import { CLASS_IDS } from '../hooks/classes'
-import { DEATH_SECONDS, resistFactor, simulateOffline, tick } from '../hooks/combat'
+import { deathGoldCap, DEATH_SECONDS, resistFactor, simulateOffline, tick } from '../hooks/combat'
+import type { CombatEvent } from '../hooks/combat'
 import { drawHud, HUD_ROWS } from '../hooks/hud'
 import { isNewer, versionIn } from '../hooks/version'
+import { bless, BLESSING_MF, BLESSING_SECONDS, CHEST_COOLDOWN, FOCUS_MAX, FOCUS_PCT, gainFocus, isCommitCommand, isTestCommand, openChest } from '../hooks/coding'
 import {
   activeSets,
   BAG_SIZE,
@@ -150,10 +152,10 @@ test('a low hero drinks a red potion', () => {
 })
 
 test('death costs a tenth of the gold, and the hero gets up again', () => {
-  const c = hero('sorceress', 1, { hp: 1, gold: 1000, belt: { red: 0, blue: 0 } })
+  const c = hero('sorceress', 1, { hp: 1, gold: 500, belt: { red: 0, blue: 0 } })
   const r = tick({ ...c, foes: [{ ...newFoe(0), hp: 1e6, maxHp: 1e6, atk: 1e6 }] }, () => 0.9)
   expect(r.events.some(ev => ev.kind === 'death')).toBe(true)
-  expect(r.save.gold).toBe(900)
+  expect(r.save.gold).toBe(450)
   expect(r.save.deadFor).toBe(DEATH_SECONDS)
 
   let s = r.save
@@ -719,4 +721,50 @@ test('version check: only a later published version counts as an update', () => 
   expect(versionIn('{"name":"idle-rpg","version":"1.2.0"}')).toBe('1.2.0')
   expect(versionIn('404: Not Found')).toBe(undefined)
   expect(versionIn('{"version":"latest"}')).toBe(undefined)
+})
+
+test('coding: tools give capped focus that boosts damage, xp and gold, then fades', () => {
+  const c = newCharacter('barbarian')
+  let f = c
+  for (let i = 0; i < 20; i++) f = gainFocus(f)
+  expect(f.focus).toBe(FOCUS_MAX)
+  const plain = heroStats(c)
+  const sharp = heroStats(f)
+  expect(sharp.physMult).toBeGreaterThan(plain.physMult)
+  expect(sharp.xpPct).toBe(FOCUS_PCT)
+  expect(sharp.goldFind).toBe(plain.goldFind + FOCUS_PCT)
+  expect(tick({ ...f, walk: 3 }, () => 0.5).save.focus).toBe(FOCUS_MAX - 1)
+})
+
+test('coding: passing tests bless, a commit opens a chest at most every ten minutes', () => {
+  const c = { ...newCharacter('sorceress'), zone: 30, maxZone: 30, hp: 1, gold: 0 }
+  const blessed = bless(c)
+  expect(blessed.blessing).toBe(BLESSING_SECONDS)
+  expect(blessed.hp).toBe(heroStats(blessed).maxHp)
+  expect(heroStats(blessed).magicFind).toBe(heroStats(c).magicFind + BLESSING_MF)
+
+  const opened = openChest(c, () => 0.5)
+  expect(opened.save.gold).toBeGreaterThan(0)
+  expect(opened.save.chestCooldown).toBe(CHEST_COOLDOWN)
+  const ev = opened.events[0]
+  expect(ev?.kind === 'chest' && ev.event.kind === 'loot' && ev.event.item.rarity >= 2).toBe(true)
+  expect(openChest(opened.save, () => 0.5).events.length).toBe(0)
+
+  expect(isTestCommand('npm test')).toBe(true)
+  expect(isTestCommand('npx vitest run')).toBe(true)
+  expect(isTestCommand('claude plugin test .')).toBe(true)
+  expect(isTestCommand('cat latest.txt')).toBe(false)
+  expect(isCommitCommand('git add -A && git commit -m "x"')).toBe(true)
+  expect(isCommitCommand('git status')).toBe(false)
+})
+
+test('a death costs at most the death cap', () => {
+  const c = { ...newCharacter('necromancer'), zone: 50, maxZone: 50, hp: 1, gold: 1e12 }
+  let r = { save: c, events: [] as CombatEvent[] }
+  for (let i = 0; i < 40 && r.save.deadFor === 0; i++) {
+    r = tick({ ...r.save, hp: 1, walk: 0, foes: r.save.foes.length ? r.save.foes : newPack(50, 0, () => 0.5) }, () => 0.5)
+  }
+  const death = r.events.find(ev => ev.kind === 'death')
+  expect(death?.kind === 'death' && death.goldLost === deathGoldCap(50)).toBe(true)
+  expect(deathGoldCap(50)).toBeLessThan(1e11)
 })

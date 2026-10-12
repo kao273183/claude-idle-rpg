@@ -11,6 +11,7 @@ import { emptyPouch, GEM_TYPES, gemName, normalizeItem, RARITIES, shownName, sta
 import { formatDuration, formatNumber, newPack, placeOf, zoneName } from './monsters'
 import { BattlePage, BLOOD, CharPage, CubePage, GearPage, GemsPage, GOLD, OddsPage, QuestsPage, RiftPage, SelectPage, SkillsPage, TownPage } from './pages'
 import { formatClock } from './rift'
+import { bless, BLESSING_MF, gainFocus, isCommitCommand, isTestCommand, openChest } from './coding'
 import { CHECK_EVERY_MS, isNewer, LATEST_URL, VERSION, versionIn } from './version'
 import { ACT_INTROS, emptyQuestBonus } from './quests'
 import { RUNE_COLOR, runeName, RUNES } from './runes'
@@ -137,7 +138,10 @@ const describe = (ev: CombatEvent): LogLine | undefined => {
 const statusText = (g: Game, newer?: string) => {
   const note = newer ? `・有新版 ${newer}，重開 Claude Code 即可更新` : ''
 
-  return gameStatus(g) + note
+  const c = g.active ? g.chars[g.active] : undefined
+  const boons = c ? (c.focus > 0 ? `・⚡專注 ${formatClock(c.focus)}` : '') + (c.blessing > 0 ? `・✚祝福 ${formatClock(c.blessing)}` : '') : ''
+
+  return gameStatus(g) + boons + note
 }
 
 const gameStatus = (g: Game) => {
@@ -305,6 +309,53 @@ export const register: Register = on => {
     })
 
     return next(e)
+  })
+
+  // Claude's work feeds the hero: every tool brings focus, a commit a chest, passing tests a blessing.
+  on('tool.call', async ($, e, next) => {
+    const result = await next(e)
+    try {
+      if (!latest?.active || result.deny !== undefined) return result
+      const command = e.tool === 'Bash' || e.tool === 'PowerShell' ? String((e as { command?: unknown }).command ?? '') : ''
+      const isOk = !result.isError
+      const committed =
+        isOk && (((result.result as { gitOperation?: { commit?: unknown } } | undefined)?.gitOperation?.commit !== undefined) || isCommitCommand(command))
+      const isBlessed = isOk && isTestCommand(command)
+      let chest: ReturnType<typeof openChest>['events'] = []
+      const game = await update($, gameAtom, g => {
+        const c = g.active ? g.chars[g.active] : undefined
+        if (!c) return g
+        let hero = gainFocus(c)
+        if (isBlessed) hero = bless(hero)
+        if (committed) {
+          const opened = openChest(hero, Math.random)
+          hero = opened.save
+          chest = opened.events
+        }
+
+        return { ...g, chars: { ...g.chars, [c.classId]: hero } }
+      })
+      latest = game
+      const lines: LogLine[] = []
+      for (const ev of chest) {
+        if (ev.kind !== 'chest' || ev.event.kind !== 'loot') continue
+        const item = ev.event.item
+        const text = `▣ 提交了程式碼，打開寶箱：+${formatNumber(ev.gold)} 金幣、【${RARITIES[item.rarity].name}】${shownName(item)}`
+        lines.push({ text, color: RARITIES[item.rarity].color })
+        $.ui.toast(text, { timeoutMs: 8000 })
+      }
+      if (isBlessed) {
+        const text = `✚ 測試通過！祝福降臨：生命法力全滿，魔法尋寶 +${BLESSING_MF}%（10 分鐘）`
+        lines.push({ text, color: '#40c040' })
+        $.ui.toast(text, { timeoutMs: 6000 })
+      }
+      if (lines.length > 0) await update($, logAtom, log => [...log, ...lines].slice(-6))
+      $.ui.status(statusText(game, newer))
+    } catch {
+      // The game never gets in the way of the work.
+    }
+
+    return result
   })
 
   on('session.end', async ($, e, next) => {

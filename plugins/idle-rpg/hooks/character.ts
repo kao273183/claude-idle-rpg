@@ -64,6 +64,9 @@ export const newCharacter = (classId: ClassId): Character => {
     riftBest: 0,
     autoRift: true,
     riftLast: null,
+    focus: 0,
+    blessing: 0,
+    chestCooldown: 0,
     autoEquip: true,
     nextItemId: 1,
   }
@@ -219,6 +222,10 @@ export const buffTotals = (c: Character): Required<BuffEffect> => {
 export const canWear = (c: Character, item: Item) =>
   (item.req?.str ?? 0) <= attrOf(c, 'str') && (item.req?.dex ?? 0) <= attrOf(c, 'dex')
 
+/** What focus (from tools Claude runs) and blessing (from passing tests) give, in percent. */
+export const FOCUS_PCT = 25
+export const BLESSING_MF = 100
+
 export const heroStats = (c: Character) => {
   const cls = CLASSES[c.classId]
   const gear = gearStats(c.equipment, c.charms)
@@ -226,6 +233,9 @@ export const heroStats = (c: Character) => {
   const b = buffTotals(c)
   // Talents and the legendary powers of worn uniques and sets work the same way.
   const t = { ...talentTotals(c) }
+  // Focus from Claude's work at the keyboard.
+  const focus = c.focus > 0 ? FOCUS_PCT : 0
+  t.dmgPct += focus
   for (const [k, v] of Object.entries(gear.power)) (t as Record<string, number>)[k] = ((t as Record<string, number>)[k] ?? 0) + v
   const str = attrOf(c, 'str')
   const dex = attrOf(c, 'dex')
@@ -255,14 +265,15 @@ export const heroStats = (c: Character) => {
     critMult: 2 + (p.critDmg + t.critDmg) / 100,
     dr: Math.min(0.6, (p.dr + t.dr) / 100),
     manaRegen: maxMana * 0.03 * (1 + (p.manaRegenPct + t.manaRegenPct) / 100) + 1,
-    goldFind: gear.flat.gf + t.gf,
-    magicFind: gear.flat.mf + t.mf,
+    goldFind: gear.flat.gf + t.gf + focus,
+    magicFind: gear.flat.mf + t.mf + (c.blessing > 0 ? BLESSING_MF : 0),
+    xpPct: focus,
     leech: gear.flat.ls + t.leech,
     plusSkills: gear.flat.skills,
     potionFind: p.potionFind,
     bleedPct: p.bleedPct,
     elementPct: { fire: p.firePct + t.firePct, cold: p.coldPct + t.coldPct, light: p.lightPct + t.lightPct, poison: t.poisonPct, magic: t.magicPct } as Record<string, number>,
-    minionPct: p.minionPct + t.minionPct + gear.flat.minion,
+    minionPct: p.minionPct + t.minionPct + gear.flat.minion + focus,
     spellDmgPct: b.dmgPct + t.dmgPct + gear.flat.spell,
     talent: t,
     /** Fire, cold, lightning and poison alike; may be below zero. */

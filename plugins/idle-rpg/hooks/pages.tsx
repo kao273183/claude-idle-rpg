@@ -109,6 +109,8 @@ import {
   TALENTS,
   takeTalent,
 } from './talents'
+import { BLESSING_MF, FOCUS_MAX, FOCUS_PCT, FOCUS_PER_CALL } from './coding'
+import { deathGoldCap } from './combat'
 import { formatClock, isRiftOpen, KEY_DROP_CHANCE, RIFT_SECONDS, RIFT_UNLOCK_ZONE, startRift, TIER_STEP } from './rift'
 
 export const GOLD = '#c7b377'
@@ -467,6 +469,30 @@ export const CharPage = (ctx: PageCtx) => {
           {char.deaths}
           <Text dimColor>　金幣 </Text>
           <Text color={GOLD}>{formatNumber(char.gold)}</Text>
+          <Text dimColor>　死亡最多損失 {formatNumber(deathGoldCap(char.zone))}</Text>
+        </Text>
+      </Box>
+      <Box flexDirection="column">
+        <Text bold color={GOLD}>
+          寫程式的加成
+        </Text>
+        <Text>
+          <Text color={char.focus > 0 ? '#ffd040' : undefined} dimColor={char.focus === 0}>
+            ⚡ 專注 {char.focus > 0 ? formatClock(char.focus) : '—'}
+          </Text>
+          <Text dimColor>　Claude 每執行一次工具 +{FOCUS_PER_CALL} 秒（最多 {FOCUS_MAX / 60} 分鐘）：傷害、經驗、金幣 +{FOCUS_PCT}%</Text>
+        </Text>
+        <Text>
+          <Text color={char.blessing > 0 ? GREEN : undefined} dimColor={char.blessing === 0}>
+            ✚ 祝福 {char.blessing > 0 ? formatClock(char.blessing) : '—'}
+          </Text>
+          <Text dimColor>　測試通過時：生命法力全滿，魔法尋寶 +{BLESSING_MF}%，持續 10 分鐘</Text>
+        </Text>
+        <Text>
+          <Text color={char.chestCooldown > 0 ? undefined : GOLD} dimColor={char.chestCooldown > 0}>
+            ▣ 寶箱 {char.chestCooldown > 0 ? formatClock(char.chestCooldown) : '可開啟'}
+          </Text>
+          <Text dimColor>　每次 git commit 開一箱：金幣與稀有以上的裝備（每 10 分鐘最多一箱）</Text>
         </Text>
       </Box>
       <Box flexDirection="column">

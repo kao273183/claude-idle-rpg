@@ -1,5 +1,5 @@
 /** Keep in step with .claude-plugin/plugin.json and the marketplace entry. */
-export const VERSION = '1.1.0'
+export const VERSION = '1.2.0'
 
 /** The published manifest: whatever version it names is the newest one out. */
 export const LATEST_URL = 'https://raw.githubusercontent.com/kao273183/claude-idle-rpg/main/plugins/idle-rpg/.claude-plugin/plugin.json'

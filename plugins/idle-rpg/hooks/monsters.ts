@@ -154,7 +154,7 @@ const UNIQUE_TITLE = ['屠夫', '吞噬者', '掠奪者', '巫師', '詛咒者',
 const pick = <T>(list: readonly T[], rng: Rng): T => list[Math.floor(rng() * list.length)]!
 
 /** How strong the monsters of a zone are: one curve for every act and difficulty. */
-const zonePower = (zone: number) => ({ hp: Math.pow(1.45, zone), atk: Math.pow(1.35, zone), reward: Math.pow(1.3, zone) })
+export const zonePower = (zone: number) => ({ hp: Math.pow(1.45, zone), atk: Math.pow(1.35, zone), reward: Math.pow(1.3, zone) })
 
 const ELITE_MULT = {
   normal: { hp: 0.5, atk: 0.28, xp: 0.5, gold: 0.5 },

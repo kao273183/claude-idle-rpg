@@ -211,6 +211,12 @@ export type Character = {
   /** Opens rifts by itself while keystones last, pushing the tier as far as it holds. */
   autoRift: boolean
   riftLast: RiftResult | null
+  /** Seconds of focus left, earned by tools Claude runs. */
+  focus: number
+  /** Seconds of blessing left, earned by passing tests. */
+  blessing: number
+  /** Seconds before a commit opens another chest. */
+  chestCooldown: number
   autoEquip: boolean
   nextItemId: number
 }
