@@ -11,6 +11,7 @@ import { emptyPouch, GEM_TYPES, gemName, normalizeItem, RARITIES, shownName, sta
 import { formatDuration, formatNumber, newPack, placeOf, zoneName } from './monsters'
 import { BattlePage, BLOOD, CharPage, CubePage, GearPage, GemsPage, GOLD, OddsPage, QuestsPage, RiftPage, SelectPage, SkillsPage, TownPage } from './pages'
 import { formatClock } from './rift'
+import { CHECK_EVERY_MS, isNewer, LATEST_URL, VERSION, versionIn } from './version'
 import { ACT_INTROS, emptyQuestBonus } from './quests'
 import { RUNE_COLOR, runeName, RUNES } from './runes'
 import type { PageCtx } from './pages'
@@ -133,7 +134,13 @@ const describe = (ev: CombatEvent): LogLine | undefined => {
   }
 }
 
-const statusText = (g: Game) => {
+const statusText = (g: Game, newer?: string) => {
+  const note = newer ? `・有新版 ${newer}，重開 Claude Code 即可更新` : ''
+
+  return gameStatus(g) + note
+}
+
+const gameStatus = (g: Game) => {
   const c = g.active ? g.chars[g.active] : undefined
   if (!c) return '☠ 暗黑放置：輸入 /rpg 選擇你的英雄'
   const who = c.rift
@@ -159,6 +166,8 @@ export const register: Register = on => {
   let currentView: View = 'battle'
   let latest: Game | undefined
   let $now: () => Promise<number> = async () => 0
+  /** A newer published version, once a check has found one. */
+  let newer: string | undefined
 
   const activeChar = (g: Game | undefined) => (g?.active ? g.chars[g.active] : undefined)
   const sceneT = async () => Math.min(1, Math.max(0, ((await $now()) - lastTickAt) / TICK_MS))
@@ -201,7 +210,23 @@ export const register: Register = on => {
     }
     latest = await read($, gameAtom)
     lastTickAt = now
-    $.ui.status(statusText(latest))
+    $.ui.status(statusText(latest, newer))
+
+    // Installed copies only learn of a new version on restart: look now and then, and say so once.
+    const checkForUpdate = async () => {
+      try {
+        const res = await $.http.fetch(LATEST_URL)
+        const found = res.ok ? versionIn(res.text) : undefined
+        if (!found || !isNewer(found, VERSION) || found === newer) return
+        newer = found
+        $.ui.toast(`✦ 暗黑放置有新版 ${found}（你的是 ${VERSION}）。重開 Claude Code 即可更新，存檔會保留。`, { timeoutMs: 12000 })
+        if (latest) $.ui.status(statusText(latest, newer))
+      } catch {
+        // Offline or refused: try again at the next check.
+      }
+    }
+    void checkForUpdate()
+    $.clock.every(CHECK_EVERY_MS, checkForUpdate)
 
     let ticks = 0
     $.clock.every(TICK_MS, async () => {
@@ -254,7 +279,7 @@ export const register: Register = on => {
           $.ui.toast(describe(ev)?.text ?? '')
         }
       }
-      $.ui.status(statusText(game))
+      $.ui.status(statusText(game, newer))
 
       ticks += 1
       if (ticks % SAVE_EVERY_TICKS === 0) await $.store.set(STORE_KEY, { ...game, lastSeen: lastTickAt })
@@ -359,7 +384,7 @@ export const register: Register = on => {
         await $.store.set(STORE_KEY, { ...after, lastSeen: await $.clock.now() })
         currentView = 'battle'
         await update($, viewAtom, () => 'battle' as View)
-        $.ui.status(statusText(after))
+        $.ui.status(statusText(after, newer))
       })()
     }
     const toast = (text: string) => $.ui.toast(text)

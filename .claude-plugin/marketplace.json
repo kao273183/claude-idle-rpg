@@ -9,7 +9,7 @@
       "name": "idle-rpg",
       "source": "./plugins/idle-rpg",
       "description": "在 Claude Code 裡玩的暗黑風放置 RPG：三職業、五幕、怪物群、符文之語、天賦樹、大秘境",
-      "version": "1.0.0"
+      "version": "1.1.0"
     }
   ]
 }

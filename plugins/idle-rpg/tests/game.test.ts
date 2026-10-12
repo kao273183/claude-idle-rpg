@@ -18,6 +18,7 @@ import {
 import { CLASS_IDS } from '../hooks/classes'
 import { DEATH_SECONDS, resistFactor, simulateOffline, tick } from '../hooks/combat'
 import { drawHud, HUD_ROWS } from '../hooks/hud'
+import { isNewer, versionIn } from '../hooks/version'
 import {
   activeSets,
   BAG_SIZE,
@@ -707,4 +708,15 @@ test('a class set of six earns its six-piece power', () => {
   const set = activeSets(c.equipment).find(s => s.id === 'trang')
   expect(set?.count).toBe(6)
   expect(heroStats(c).talent.minionExplode).toBe(60)
+})
+
+test('version check: only a later published version counts as an update', () => {
+  expect(isNewer('1.1.0', '1.0.0')).toBe(true)
+  expect(isNewer('1.10.0', '1.9.3')).toBe(true)
+  expect(isNewer('2.0', '1.9.9')).toBe(true)
+  expect(isNewer('1.1.0', '1.1.0')).toBe(false)
+  expect(isNewer('1.0.9', '1.1.0')).toBe(false)
+  expect(versionIn('{"name":"idle-rpg","version":"1.2.0"}')).toBe('1.2.0')
+  expect(versionIn('404: Not Found')).toBe(undefined)
+  expect(versionIn('{"version":"latest"}')).toBe(undefined)
 })

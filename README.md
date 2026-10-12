@@ -64,9 +64,19 @@ claude --plugin-dir claude-idle-rpg/plugins/idle-rpg
 
 面板寬度建議 90 欄以上，怪物群和僕從才不會擠在一起。
 
+## 更新
+
+遊戲執行時每小時會檢查一次 GitHub 上的版本，有新版會跳出提示，狀態列也會顯示。
+
+- **建議打開自動更新**：輸入 `/plugin`，到 marketplace 管理頁選 `claude-idle-rpg`，開啟自動更新。之後每次啟動 Claude Code 都會自動抓新版。
+- **手動更新**：輸入 `/plugin marketplace update claude-idle-rpg`，再到 `/plugin` 更新 idle-rpg，然後重開 Claude Code。
+- **用 git clone 安裝的**：在資料夾裡 `git pull`，再重開 Claude Code。
+
+新版要**重開 Claude Code** 才會載入，存檔不會受影響。
+
 ## 存檔
 
-存檔存在你自己電腦的 Claude Code 外掛資料裡，每個人各自一份。
+存檔存在你自己電腦的 Claude Code 外掛資料裡，每個人各自一份，更新也不會清掉。
 
 ## 開發
 
